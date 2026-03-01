@@ -686,7 +686,7 @@ export async function getJudgeScoresAction(eventId: string, roundNumber: number)
          json_agg(json_build_object('judge_id', js.judge_id, 'score', js.score) ORDER BY js.created_at) as scores
        FROM registrations r
        LEFT JOIN judge_scores js ON js.registration_id = r.id AND js.event_id = $1 AND js.round_number = $2
-       WHERE r.event_id = $1 AND (r.round_number = $2 OR js.round_number = $2) AND r.status = 'approved'
+       WHERE r.event_id = $1 AND r.status = 'approved'
        GROUP BY r.id, r.full_name, r.registration_number, r.car_make, r.car_model, r.car_category, r.car_photo_url
        HAVING COUNT(js.id) > 0 OR r.round_number = $2
        ORDER BY avg_score DESC NULLS LAST`,

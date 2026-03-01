@@ -5,7 +5,12 @@ import { revalidatePath } from 'next/cache';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import bcrypt from 'bcryptjs';
+import { jwtVerify } from 'jose';
 import { sendApprovalNotify, sendRejectionNotify } from './notifications'; // We will create this
+
+const JWT_SECRET = new TextEncoder().encode(
+  process.env.JWT_SECRET || 'AKAutoshow-Super-Secret-JWT-Key-2025-Admin-System'
+);
 
 const parseOrganizerSession = (raw?: string) => {
   if (!raw) return null;
@@ -33,12 +38,39 @@ type OrganizerSession = {
   role: string;
   eventId: string;
   name: string;
+  isAdmin?: boolean;
 };
 
 async function getOrganizerSession(): Promise<OrganizerSession | null> {
   const cookieStore = await cookies();
-  const session = cookieStore.get('organizer_session');
-  return (parseOrganizerSession(session?.value) as OrganizerSession | null) || null;
+  
+  // 1. Try Organizer Cookie
+  const orgSession = cookieStore.get('organizer_session');
+  let session: OrganizerSession | null = null;
+  if (orgSession?.value) {
+    session = parseOrganizerSession(orgSession.value) as OrganizerSession | null;
+  }
+  
+  // 2. Try Admin Token
+  if (!session) {
+    const adminToken = cookieStore.get('carshowx_admin_token');
+    if (adminToken?.value) {
+      try {
+        const { payload } = await jwtVerify(adminToken.value, JWT_SECRET);
+        session = {
+          userId: String(payload.id),
+          role: String(payload.role),
+          eventId: payload.assignedEventId ? String(payload.assignedEventId) : 'ALL_EVENTS',
+          name: String(payload.name || 'Admin'),
+          isAdmin: true
+        };
+      } catch (e) {
+        // failed
+      }
+    }
+  }
+
+  return session;
 }
 
 async function logAdminActivity(params: {
@@ -430,7 +462,7 @@ export async function setRegistrationGateStatusAction(params: {
   try {
     const session = await getOrganizerSession();
     if (!session) return { success: false, message: 'Unauthorized' };
-    if (String(session.eventId) !== String(params.eventId)) {
+    if (session.eventId !== 'ALL_EVENTS' && String(session.eventId) !== String(params.eventId)) {
       return { success: false, message: 'Forbidden' };
     }
 
@@ -488,7 +520,7 @@ export async function gate1PassAction(params: { regId: string; eventId: string }
   try {
     const session = await getOrganizerSession();
     if (!session) return { success: false, message: 'Unauthorized' };
-    if (String(session.eventId) !== String(params.eventId)) return { success: false, message: 'Forbidden' };
+    if (session.eventId !== 'ALL_EVENTS' && String(session.eventId) !== String(params.eventId)) return { success: false, message: 'Forbidden' };
 
     await query(
       `UPDATE registrations
@@ -506,7 +538,7 @@ export async function gate1RejectAction(params: { regId: string; eventId: string
   try {
     const session = await getOrganizerSession();
     if (!session) return { success: false, message: 'Unauthorized' };
-    if (String(session.eventId) !== String(params.eventId)) return { success: false, message: 'Forbidden' };
+    if (session.eventId !== 'ALL_EVENTS' && String(session.eventId) !== String(params.eventId)) return { success: false, message: 'Forbidden' };
 
     await query(
       `UPDATE registrations
@@ -526,7 +558,7 @@ export async function gate2PassAction(params: { regId: string; eventId: string }
   try {
     const session = await getOrganizerSession();
     if (!session) return { success: false, message: 'Unauthorized' };
-    if (String(session.eventId) !== String(params.eventId)) return { success: false, message: 'Forbidden' };
+    if (session.eventId !== 'ALL_EVENTS' && String(session.eventId) !== String(params.eventId)) return { success: false, message: 'Forbidden' };
 
     await query(
       `UPDATE registrations
@@ -551,7 +583,7 @@ export async function gate2RejectAction(params: { regId: string; eventId: string
   try {
     const session = await getOrganizerSession();
     if (!session) return { success: false, message: 'Unauthorized' };
-    if (String(session.eventId) !== String(params.eventId)) return { success: false, message: 'Forbidden' };
+    if (session.eventId !== 'ALL_EVENTS' && String(session.eventId) !== String(params.eventId)) return { success: false, message: 'Forbidden' };
 
     await query(
       `UPDATE registrations
@@ -571,6 +603,7 @@ export async function recordExitAction(params: { regId: string; eventId: string 
   try {
     const session = await getOrganizerSession();
     if (!session) return { success: false, message: 'Unauthorized' };
+    if (session.eventId !== 'ALL_EVENTS' && String(session.eventId) !== String(params.eventId)) return { success: false, message: 'Forbidden' };
 
     await query(
       `INSERT INTO entry_log (registration_id, event_id, action, officer_id) VALUES ($1, $2, 'exit', $3)`,
@@ -586,6 +619,7 @@ export async function recordReEntryAction(params: { regId: string; eventId: stri
   try {
     const session = await getOrganizerSession();
     if (!session) return { success: false, message: 'Unauthorized' };
+    if (session.eventId !== 'ALL_EVENTS' && String(session.eventId) !== String(params.eventId)) return { success: false, message: 'Forbidden' };
 
     await query(
       `INSERT INTO entry_log (registration_id, event_id, action, officer_id) VALUES ($1, $2, 're_enter', $3)`,
@@ -608,6 +642,7 @@ export async function submitJudgeScoreAction(params: {
   try {
     const session = await getOrganizerSession();
     if (!session) return { success: false, message: 'Unauthorized' };
+    if (session.eventId !== 'ALL_EVENTS' && String(session.eventId) !== String(params.eventId)) return { success: false, message: 'Forbidden' };
 
     if (params.score < 1 || params.score > 10) return { success: false, message: 'Score must be 1-10' };
 
@@ -651,8 +686,9 @@ export async function getJudgeScoresAction(eventId: string, roundNumber: number)
          json_agg(json_build_object('judge_id', js.judge_id, 'score', js.score) ORDER BY js.created_at) as scores
        FROM registrations r
        LEFT JOIN judge_scores js ON js.registration_id = r.id AND js.event_id = $1 AND js.round_number = $2
-       WHERE r.event_id = $1 AND r.round_number = $2 AND r.status = 'approved'
+       WHERE r.event_id = $1 AND (r.round_number = $2 OR js.round_number = $2) AND r.status = 'approved'
        GROUP BY r.id, r.full_name, r.registration_number, r.car_make, r.car_model, r.car_category, r.car_photo_url
+       HAVING COUNT(js.id) > 0 OR r.round_number = $2
        ORDER BY avg_score DESC NULLS LAST`,
       [eventId, roundNumber]
     );
@@ -667,7 +703,7 @@ export async function getLiveStatsAction(eventId: string) {
   try {
     const session = await getOrganizerSession();
     if (!session) return null;
-    if (String(session.eventId) !== String(eventId)) return null;
+    if (session.eventId !== 'ALL_EVENTS' && String(session.eventId) !== String(eventId)) return null;
 
     const eventRes = await query(`SELECT current_round FROM events WHERE id = $1`, [eventId]);
     const currentRound = eventRes.rows[0]?.current_round ?? 1;

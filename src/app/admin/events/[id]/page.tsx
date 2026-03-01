@@ -194,28 +194,28 @@ export default function EventDashboard({ params }: { params: Promise<{ id: strin
             <span className="text-green-500">📱</span> أدوات المنظم الميدانية (جديد)
           </h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Link href={`/organizer/events/${id}/gate1`} target="_blank" className="bg-[#1a1a1a] border border-orange-700/50 hover:border-orange-500 rounded-xl p-5 text-center transition group relative overflow-hidden">
+            <Link href={`/admin/events/${id}/gate1`} className="bg-[#1a1a1a] border border-orange-700/50 hover:border-orange-500 rounded-xl p-5 text-center transition group relative overflow-hidden">
               <div className="absolute top-0 right-0 p-1 bg-orange-600 text-[10px] font-bold px-2 rounded-bl-lg">MOBILE</div>
               <div className="text-3xl mb-2 group-hover:scale-110 transition-transform">🔶</div>
               <div className="font-bold text-orange-400 text-lg">البوابة 1</div>
               <div className="text-xs text-gray-500 mt-1">التحقق من الهوية</div>
             </Link>
 
-            <Link href={`/organizer/events/${id}/gate2`} target="_blank" className="bg-[#1a1a1a] border border-blue-700/50 hover:border-blue-500 rounded-xl p-5 text-center transition group relative overflow-hidden">
+            <Link href={`/admin/events/${id}/gate2`} className="bg-[#1a1a1a] border border-blue-700/50 hover:border-blue-500 rounded-xl p-5 text-center transition group relative overflow-hidden">
               <div className="absolute top-0 right-0 p-1 bg-blue-600 text-[10px] font-bold px-2 rounded-bl-lg">MOBILE</div>
               <div className="text-3xl mb-2 group-hover:scale-110 transition-transform">🔷</div>
               <div className="font-bold text-blue-400 text-lg">البوابة 2</div>
               <div className="text-xs text-gray-500 mt-1">الفحص الفني & الدخول</div>
             </Link>
 
-            <Link href={`/organizer/events/${id}/judge`} target="_blank" className="bg-[#1a1a1a] border border-purple-700/50 hover:border-purple-500 rounded-xl p-5 text-center transition group relative overflow-hidden">
+            <Link href={`/admin/events/${id}/judge`} className="bg-[#1a1a1a] border border-purple-700/50 hover:border-purple-500 rounded-xl p-5 text-center transition group relative overflow-hidden">
               <div className="absolute top-0 right-0 p-1 bg-purple-600 text-[10px] font-bold px-2 rounded-bl-lg">MOBILE</div>
               <div className="text-3xl mb-2 group-hover:scale-110 transition-transform">🏆</div>
               <div className="font-bold text-purple-400 text-lg">التحكيم</div>
               <div className="text-xs text-gray-500 mt-1">تقييم 1-10</div>
             </Link>
 
-            <Link href={`/organizer/events/${id}/live`} target="_blank" className="bg-[#1a1a1a] border border-green-700/50 hover:border-green-500 rounded-xl p-5 text-center transition group relative overflow-hidden">
+            <Link href={`/admin/events/${id}/live`} className="bg-[#1a1a1a] border border-green-700/50 hover:border-green-500 rounded-xl p-5 text-center transition group relative overflow-hidden">
               <div className="absolute top-0 right-0 p-1 bg-green-600 text-[10px] font-bold px-2 rounded-bl-lg">LIVE</div>
               <div className="text-3xl mb-2 group-hover:scale-110 transition-transform">📊</div>
               <div className="font-bold text-green-400 text-lg">مباشر</div>

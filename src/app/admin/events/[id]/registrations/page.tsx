@@ -128,6 +128,7 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [approvalSuccess, setApprovalSuccess] = useState<string | null>(null);
   const [filter, setFilter] = useState('all');
+  const [roundFilter, setRoundFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [attendanceFilter, setAttendanceFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -176,6 +177,11 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
   useEffect(() => {
     let result = registrations;
 
+    // Filter by round
+    if (roundFilter !== 'all') {
+      result = result.filter(r => String(r.round_number) === roundFilter);
+    }
+
     // Filter by status
     if (filter !== 'all') {
       result = result.filter(r => r.status === filter);
@@ -209,7 +215,7 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
     }
 
     setFilteredData(result);
-  }, [registrations, filter, categoryFilter, attendanceFilter, searchQuery]);
+  }, [registrations, filter, roundFilter, categoryFilter, attendanceFilter, searchQuery]);
 
   const handleApprove = async (regId: string) => {
     if (!window.confirm('هل أنت متأكد من قبول هذا المتسابق؟ سيتم إنشاء حساب له فوراً.')) return;
@@ -516,6 +522,18 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
                 />
             </div>
             <div className="flex gap-3">
+                <div className="relative min-w-[140px]">
+                    <select 
+                        className="w-full bg-[#0f1115] border border-orange-800 text-white text-sm rounded-lg px-4 py-2.5 focus:border-orange-500 outline-none appearance-none cursor-pointer font-semibold"
+                        value={roundFilter}
+                        onChange={(e) => setRoundFilter(e.target.value)}
+                    >
+                        <option value="all">🏁 كل الجولات</option>
+                        <option value="1">الجولة 1</option>
+                        <option value="2">الجولة 2</option>
+                        <option value="3">الجولة 3</option>
+                    </select>
+                </div>
                 <div className="relative min-w-[160px]">
                     <Filter className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
                     <select 

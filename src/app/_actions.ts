@@ -56,9 +56,13 @@ export async function registerAction(formData: FormData): Promise<RegistrationRe
     
     console.log('🎫 رقم التسجيل المولد:', registrationNumber);
 
+    // Get current_round from the event
+    const eventRes = await query(`SELECT current_round FROM events WHERE id = $1`, [eventId]);
+    const currentRound = eventRes.rows[0]?.current_round ?? 1;
+
     const insertQuery = `
-      INSERT INTO registrations (event_id, full_name, email, phone_number, car_make, car_model, car_year, status, registration_number, country_code)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      INSERT INTO registrations (event_id, full_name, email, phone_number, car_make, car_model, car_year, status, registration_number, country_code, round_number)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       RETURNING id, created_at
     `;
     
@@ -72,7 +76,8 @@ export async function registerAction(formData: FormData): Promise<RegistrationRe
       parseInt(carYear), 
       'pending', 
       registrationNumber,
-      countryCode
+      countryCode,
+      currentRound
     ];
 
     const result = await query(insertQuery, registrationValues);

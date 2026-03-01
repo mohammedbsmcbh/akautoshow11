@@ -52,12 +52,16 @@ export async function registerGroupAction(formData: FormData): Promise<Registrat
 
     // 2. إنشاء التسجيل الرئيسي (Master Record)
     const registrationNumber = `GRP-${Date.now().toString().slice(-4)}`;
+
+    // Get current_round from the event
+    const eventRoundRes = await db.client.query(`SELECT current_round FROM events WHERE id = $1`, [eventId]);
+    const currentRound = eventRoundRes.rows[0]?.current_round ?? 1;
     
     // Insert into registrations table using Neon DB directly
     const insertRegQuery = `
       INSERT INTO registrations 
-      (event_id, full_name, email, phone_number, status, registration_number, registration_type, car_count, created_at, car_make, car_model, car_year, group_name)
-      VALUES ($1, $2, $3, $4, 'pending', $5, 'group', $6, NOW(), 'Various', 'Group', 2025, $7)
+      (event_id, full_name, email, phone_number, status, registration_number, registration_type, car_count, created_at, car_make, car_model, car_year, group_name, round_number)
+      VALUES ($1, $2, $3, $4, 'pending', $5, 'group', $6, NOW(), 'Various', 'Group', 2025, $7, $8)
       RETURNING id
     `;
     
@@ -73,7 +77,8 @@ export async function registerGroupAction(formData: FormData): Promise<Registrat
       countryCode + phoneNumber,
       registrationNumber,
       cars.length,
-      groupName
+      groupName,
+      currentRound
     ]);
     
     const registrationId = regRes.rows[0].id;

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useTransition } from 'react';
+import Link from 'next/link';
 import { 
     getEventRegistrations, 
     approveRegistrationAction, 
@@ -25,7 +26,8 @@ export default function EventDashboard({ params }: { params: Promise<{ id: strin
 
   // Filters
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
-    const [categoryFilter, setCategoryFilter] = useState<'all' | 'headers' | 'turbo' | '4x4'>('all');
+  const [roundFilter, setRoundFilter] = useState<'all' | '1' | '2' | '3'>('all');
+  const [categoryFilter, setCategoryFilter] = useState<'all' | 'headers' | 'turbo' | '4x4'>('all');
 
   useEffect(() => {
     loadData();
@@ -175,7 +177,11 @@ export default function EventDashboard({ params }: { params: Promise<{ id: strin
             categoryFilter === 'all'
                 ? true
                 : String(r.car_category || '').toLowerCase() === categoryFilter;
-        return matchesStatus && matchesCategory;
+        const matchesRound =
+            roundFilter === 'all'
+                ? true
+                : String((r as any).round_number) === roundFilter;
+        return matchesStatus && matchesCategory && matchesRound;
     });
 
   if (loading) return (
@@ -205,7 +211,47 @@ export default function EventDashboard({ params }: { params: Promise<{ id: strin
           </div>
        </header>
 
+       {/* Operations Navigation */}
+       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+         <Link href={`/organizer/events/${id}/gate1`} className="bg-orange-900/30 border border-orange-700/50 hover:border-orange-500 rounded-xl p-4 text-center transition group">
+           <div className="text-2xl mb-1">🔶</div>
+           <div className="text-sm font-bold text-orange-400 group-hover:text-orange-300">البوابة 1</div>
+           <div className="text-xs text-gray-500 mt-0.5">الهوية</div>
+         </Link>
+         <Link href={`/organizer/events/${id}/gate2`} className="bg-blue-900/30 border border-blue-700/50 hover:border-blue-500 rounded-xl p-4 text-center transition group">
+           <div className="text-2xl mb-1">🔷</div>
+           <div className="text-sm font-bold text-blue-400 group-hover:text-blue-300">البوابة 2</div>
+           <div className="text-xs text-gray-500 mt-0.5">الفحص الفني</div>
+         </Link>
+         <Link href={`/organizer/events/${id}/judge`} className="bg-purple-900/30 border border-purple-700/50 hover:border-purple-500 rounded-xl p-4 text-center transition group">
+           <div className="text-2xl mb-1">🏆</div>
+           <div className="text-sm font-bold text-purple-400 group-hover:text-purple-300">التحكيم</div>
+           <div className="text-xs text-gray-500 mt-0.5">تقييم 1-10</div>
+         </Link>
+         <Link href={`/organizer/events/${id}/live`} className="bg-green-900/30 border border-green-700/50 hover:border-green-500 rounded-xl p-4 text-center transition group">
+           <div className="text-2xl mb-1">📊</div>
+           <div className="text-sm font-bold text-green-400 group-hover:text-green-300">مباشر</div>
+           <div className="text-xs text-gray-500 mt-0.5">إحصائيات حية</div>
+         </Link>
+       </div>
+
        {/* Filters */}
+       <div className="flex gap-2 flex-wrap">
+          {/* Round Filter */}
+          {['all', '1', '2', '3'].map(r => (
+             <button
+                key={`round-${r}`}
+                onClick={() => setRoundFilter(r as any)}
+                className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${
+                    roundFilter === r
+                    ? 'bg-orange-600 text-white shadow-lg shadow-orange-900/20'
+                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                }`}
+             >
+                {r === 'all' ? '🏁 All Rounds' : `Round ${r}`}
+             </button>
+          ))}
+       </div>
        <div className="flex gap-2">
           {['pending', 'approved', 'rejected', 'all'].map(f => (
              <button 

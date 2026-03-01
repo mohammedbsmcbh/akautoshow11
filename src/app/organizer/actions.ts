@@ -102,6 +102,14 @@ export interface Registration {
   passenger_cpr_photo_url?: string;
   safety_checklist?: any;
   has_passenger?: boolean;
+  // Gate 1
+  gate1_status?: string | null;
+  gate1_notes?: string | null;
+  gate1_checked_at?: string | null;
+  gate1_officer_id?: string | null;
+  // Scoring
+  round_number?: number;
+  avg_score?: number | null;
 }
 
 export type RegistrationStats = {
@@ -471,5 +479,230 @@ export async function setRegistrationGateStatusAction(params: {
   } catch (error) {
     console.error('Gate status error:', error);
     return { success: false, message: 'Failed to update gate status' };
+  }
+}
+
+// ─── GATE 1 ────────────────────────────────────────────────────────────────
+
+export async function gate1PassAction(params: { regId: string; eventId: string }) {
+  try {
+    const session = await getOrganizerSession();
+    if (!session) return { success: false, message: 'Unauthorized' };
+    if (String(session.eventId) !== String(params.eventId)) return { success: false, message: 'Forbidden' };
+
+    await query(
+      `UPDATE registrations
+       SET gate1_status = 'passed', gate1_checked_at = NOW(), gate1_officer_id = $3, gate1_notes = NULL
+       WHERE id = $1 AND event_id = $2`,
+      [params.regId, params.eventId, session.userId]
+    );
+    return { success: true };
+  } catch (e: any) {
+    return { success: false, message: e.message };
+  }
+}
+
+export async function gate1RejectAction(params: { regId: string; eventId: string; notes: string }) {
+  try {
+    const session = await getOrganizerSession();
+    if (!session) return { success: false, message: 'Unauthorized' };
+    if (String(session.eventId) !== String(params.eventId)) return { success: false, message: 'Forbidden' };
+
+    await query(
+      `UPDATE registrations
+       SET gate1_status = 'rejected', gate1_checked_at = NOW(), gate1_officer_id = $3, gate1_notes = $4
+       WHERE id = $1 AND event_id = $2`,
+      [params.regId, params.eventId, session.userId, params.notes]
+    );
+    return { success: true };
+  } catch (e: any) {
+    return { success: false, message: e.message };
+  }
+}
+
+// ─── GATE 2 ────────────────────────────────────────────────────────────────
+
+export async function gate2PassAction(params: { regId: string; eventId: string }) {
+  try {
+    const session = await getOrganizerSession();
+    if (!session) return { success: false, message: 'Unauthorized' };
+    if (String(session.eventId) !== String(params.eventId)) return { success: false, message: 'Forbidden' };
+
+    await query(
+      `UPDATE registrations
+       SET check_in_status = 'checked_in', inspection_status = 'passed', checked_in_at = NOW()
+       WHERE id = $1 AND event_id = $2`,
+      [params.regId, params.eventId]
+    );
+
+    // Log entry
+    await query(
+      `INSERT INTO entry_log (registration_id, event_id, action, officer_id) VALUES ($1, $2, 'enter', $3)`,
+      [params.regId, params.eventId, session.userId]
+    );
+
+    return { success: true };
+  } catch (e: any) {
+    return { success: false, message: e.message };
+  }
+}
+
+export async function gate2RejectAction(params: { regId: string; eventId: string; notes: string }) {
+  try {
+    const session = await getOrganizerSession();
+    if (!session) return { success: false, message: 'Unauthorized' };
+    if (String(session.eventId) !== String(params.eventId)) return { success: false, message: 'Forbidden' };
+
+    await query(
+      `UPDATE registrations
+       SET inspection_status = 'rejected', rejection_reason = $3
+       WHERE id = $1 AND event_id = $2`,
+      [params.regId, params.eventId, params.notes]
+    );
+    return { success: true };
+  } catch (e: any) {
+    return { success: false, message: e.message };
+  }
+}
+
+// ─── RE-ENTRY ───────────────────────────────────────────────────────────────
+
+export async function recordExitAction(params: { regId: string; eventId: string }) {
+  try {
+    const session = await getOrganizerSession();
+    if (!session) return { success: false, message: 'Unauthorized' };
+
+    await query(
+      `INSERT INTO entry_log (registration_id, event_id, action, officer_id) VALUES ($1, $2, 'exit', $3)`,
+      [params.regId, params.eventId, session.userId]
+    );
+    return { success: true };
+  } catch (e: any) {
+    return { success: false, message: e.message };
+  }
+}
+
+export async function recordReEntryAction(params: { regId: string; eventId: string }) {
+  try {
+    const session = await getOrganizerSession();
+    if (!session) return { success: false, message: 'Unauthorized' };
+
+    await query(
+      `INSERT INTO entry_log (registration_id, event_id, action, officer_id) VALUES ($1, $2, 're_enter', $3)`,
+      [params.regId, params.eventId, session.userId]
+    );
+    return { success: true };
+  } catch (e: any) {
+    return { success: false, message: e.message };
+  }
+}
+
+// ─── JUDGE SCORING ──────────────────────────────────────────────────────────
+
+export async function submitJudgeScoreAction(params: {
+  eventId: string;
+  roundNumber: number;
+  registrationId: string;
+  score: number;
+}) {
+  try {
+    const session = await getOrganizerSession();
+    if (!session) return { success: false, message: 'Unauthorized' };
+
+    if (params.score < 1 || params.score > 10) return { success: false, message: 'Score must be 1-10' };
+
+    await query(
+      `INSERT INTO judge_scores (event_id, round_number, registration_id, judge_id, score)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (event_id, round_number, registration_id, judge_id)
+       DO UPDATE SET score = $5, created_at = NOW()`,
+      [params.eventId, params.roundNumber, params.registrationId, session.userId, params.score]
+    );
+
+    // Calculate new average
+    const avgRes = await query(
+      `SELECT AVG(score)::NUMERIC(4,2) as avg, COUNT(*) as count
+       FROM judge_scores
+       WHERE event_id = $1 AND round_number = $2 AND registration_id = $3`,
+      [params.eventId, params.roundNumber, params.registrationId]
+    );
+
+    return {
+      success: true,
+      avg: parseFloat(avgRes.rows[0]?.avg || '0'),
+      judgeCount: parseInt(avgRes.rows[0]?.count || '0')
+    };
+  } catch (e: any) {
+    return { success: false, message: e.message };
+  }
+}
+
+export async function getJudgeScoresAction(eventId: string, roundNumber: number) {
+  try {
+    const session = await getOrganizerSession();
+    if (!session) return { success: false, scores: [] };
+
+    const res = await query(
+      `SELECT
+         r.id, r.full_name, r.registration_number, r.car_make, r.car_model, r.car_category,
+         r.car_photo_url,
+         AVG(js.score)::NUMERIC(4,2) as avg_score,
+         COUNT(js.id) as judge_count,
+         json_agg(json_build_object('judge_id', js.judge_id, 'score', js.score) ORDER BY js.created_at) as scores
+       FROM registrations r
+       LEFT JOIN judge_scores js ON js.registration_id = r.id AND js.event_id = $1 AND js.round_number = $2
+       WHERE r.event_id = $1 AND r.round_number = $2 AND r.status = 'approved'
+       GROUP BY r.id, r.full_name, r.registration_number, r.car_make, r.car_model, r.car_category, r.car_photo_url
+       ORDER BY avg_score DESC NULLS LAST`,
+      [eventId, roundNumber]
+    );
+
+    return { success: true, scores: res.rows };
+  } catch (e: any) {
+    return { success: false, scores: [], message: e.message };
+  }
+}
+
+export async function getLiveStatsAction(eventId: string) {
+  try {
+    const session = await getOrganizerSession();
+    if (!session) return null;
+    if (String(session.eventId) !== String(eventId)) return null;
+
+    const eventRes = await query(`SELECT current_round FROM events WHERE id = $1`, [eventId]);
+    const currentRound = eventRes.rows[0]?.current_round ?? 1;
+
+    const statsRes = await query(
+      `SELECT
+         COUNT(*) FILTER (WHERE status = 'approved') as approved,
+         COUNT(*) FILTER (WHERE status = 'pending') as pending,
+         COUNT(*) FILTER (WHERE gate1_status = 'passed') as gate1_passed,
+         COUNT(*) FILTER (WHERE gate1_status = 'rejected') as gate1_rejected,
+         COUNT(*) FILTER (WHERE check_in_status = 'checked_in') as entered,
+         COUNT(*) FILTER (WHERE inspection_status = 'rejected') as gate2_rejected
+       FROM registrations
+       WHERE event_id = $1 AND round_number = $2`,
+      [eventId, currentRound]
+    );
+
+    const entryLogRes = await query(
+      `SELECT action, COUNT(*) as count
+       FROM entry_log
+       WHERE event_id = $1
+       GROUP BY action`,
+      [eventId]
+    );
+
+    const entryMap: Record<string, number> = {};
+    entryLogRes.rows.forEach((r: any) => { entryMap[r.action] = parseInt(r.count); });
+
+    return {
+      currentRound,
+      ...statsRes.rows[0],
+      exits: entryMap['exit'] || 0,
+      reentries: entryMap['re_enter'] || 0,
+    };
+  } catch (e: any) {
+    return null;
   }
 }

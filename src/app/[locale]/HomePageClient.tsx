@@ -100,7 +100,18 @@ export default function HomePageClient({ events }: { events: any[] }) {
   const [currentLocale, setCurrentLocale] = useState('en');
   const [sponsors, setSponsors] = useState<any[]>([]);
   const [heroLogoOk, setHeroLogoOk] = useState(true);
+  const [announcementDismissed, setAnnouncementDismissed] = useState(true);
   const heroVideoRef = useRef<HTMLVideoElement | null>(null);
+
+  useEffect(() => {
+    const dismissed = sessionStorage.getItem('round3-announcement-dismissed');
+    if (!dismissed) setAnnouncementDismissed(false);
+  }, []);
+
+  const dismissAnnouncement = () => {
+    sessionStorage.setItem('round3-announcement-dismissed', '1');
+    setAnnouncementDismissed(true);
+  };
   
   const heroVideoSrc = '/home-hero.mp4';
   const primaryEventId = '5';
@@ -496,6 +507,49 @@ export default function HomePageClient({ events }: { events: any[] }) {
       </header>
 
       <main className="flex-grow">
+        {/* Round 3 Postponement Announcement Banner */}
+        {!announcementDismissed && (
+          <div
+            dir={isRTL ? 'rtl' : 'ltr'}
+            className="relative z-40 bg-gradient-to-r from-amber-950 via-yellow-900 to-amber-950 border-b-2 border-amber-500/60 shadow-[0_4px_24px_rgba(217,119,6,0.3)]"
+          >
+            <div className="container mx-auto px-4 py-4 md:py-5">
+              <div className={`flex items-start gap-3 ${isRTL ? 'flex-row' : 'flex-row'}`}>
+                {/* Icon */}
+                <div className="flex-shrink-0 mt-0.5 text-amber-400 text-2xl">📢</div>
+
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-amber-300 text-base md:text-lg leading-snug mb-2">
+                    {isRTL
+                      ? 'إعلان هام – الجولة الثالثة من ليالي التفحيط الرمضانية (تقدر 2026)'
+                      : 'Important Notice – Round 3: Ramadan Drifting Nights (Taqqadar 2026)'}
+                  </p>
+                  <p className="text-amber-100/90 text-sm md:text-base leading-relaxed">
+                    {isRTL
+                      ? 'نظرًا للظروف الحالية، تقرر تأجيل الجولة الثالثة من ليالي التفحيط الرمضانية حتى إشعارٍ آخر. نقدّر تفهمكم وتعاونكم، وسيتم الإعلان عن أي مستجدات عبر القنوات الرسمية للفعالية.'
+                      : 'Due to current circumstances, Round 3 of Ramadan Drifting Nights has been postponed until further notice. We appreciate your understanding — updates will be shared through the official event channels.'}
+                  </p>
+                  <p className="text-amber-400/80 text-xs md:text-sm mt-2 font-medium">
+                    {isRTL ? '— اللجنة المنظمة للفعالية' : '— The Event Organizing Committee'}
+                  </p>
+                </div>
+
+                {/* Dismiss Button */}
+                <button
+                  onClick={dismissAnnouncement}
+                  aria-label="Dismiss announcement"
+                  className="flex-shrink-0 text-amber-400/70 hover:text-amber-200 transition-colors p-1 rounded-md hover:bg-amber-500/20"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Hero Section */}
         <section className="relative min-h-[70vh] flex items-center justify-center text-center bg-gradient-to-br from-purple-950 via-black to-black">
           <div className="absolute inset-0 bg-gradient-to-b from-purple-500/10 via-black/50 to-black/80"></div>          <div className="relative z-10 container mx-auto px-6 py-20">
